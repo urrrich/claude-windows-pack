@@ -1,10 +1,16 @@
-# claude-chinese-pack
+# Claude Windows Pack
 
 Windows x64 的 Claude Desktop 离线打包工具，以及 Claude Code、Cowork VM 的可选安装辅助工具。
 
 **这是非官方构建工具，不是 Claude 源码，也不是汉化补丁。** 项目不修改官方 MSIX，不绕过登录、订阅、地区限制或 Windows 虚拟化要求，与 Anthropic 无隶属关系。
 
 仓库只提供脚本、启动器源码与测试，不包含官方安装文件、图标、VM 镜像、凭据或用户数据。项目名称中的 `chinese` 指中文文档及部分安装界面，不代表修改 Claude 的界面语言。
+
+## 使用 Teamo 客户端接入 Teamorouter
+
+完成 Windows 安装后，打开 [Claude Windows 接入说明](https://teamorouter.com/zh/claude-windows-pack)，再在 Teamo 客户端登录 Teamorouter。客户端会把 Claude Desktop 和 Claude Code 所需的 API 配置写入本机；安装包本身不包含 API Key，也不会把账号信息写入构建产物。
+
+Claude Code 通过 Teamorouter 的 Anthropic 兼容入口调用已开放模型。具体模型和可用渠道以 Teamorouter 控制台当前展示为准。
 
 ## 环境
 
