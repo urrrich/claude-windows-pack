@@ -38,6 +38,31 @@ foreach ($item in $manifest) {
         throw "Payload checksum failed: $($item.Name)"
     }
 }
+# Origin markers are generated from explicit, hash-matched official metadata, never copied from user state.
+$origin = $null
+$originPath = Join-Path $PackageDirectory 'VM-ORIGIN.json'
+if (Test-Path -LiteralPath $originPath) {
+    Assert-PlainPath $originPath
+    $origin = Get-Content -LiteralPath $originPath -Raw | ConvertFrom-Json
+    if ($origin.sha -notmatch '^[a-f0-9]{40}$' -or
+        $origin.baseUrl -cne ('https://downloads.claude.ai/vms/linux/x64/' + $origin.sha) -or
+        @($origin.files).Count -ne 3) { throw 'Invalid official VM origin metadata.' }
+    $originSeen = @{}
+    foreach ($resource in $origin.files) {
+        if ($resource.name -cnotin @('rootfs.vhdx', 'vmlinuz', 'initrd') -or $originSeen.ContainsKey($resource.name)) {
+            throw 'Unexpected or duplicate official VM origin resource.'
+        }
+        $originSeen[$resource.name] = $true
+        $raw = @($manifest | Where-Object { $_.Name -ceq $resource.name })
+        $compressed = @($manifest | Where-Object { $_.Name -ceq ($resource.name + '.zst') })
+        if ($resource.rawChecksum -notmatch '^[a-fA-F0-9]{64}$' -or $resource.checksum -notmatch '^[a-fA-F0-9]{64}$' -or
+            $raw.Count -ne 1 -or $compressed.Count -ne 1 -or
+            $raw[0].SHA256 -ne $resource.rawChecksum -or $raw[0].Length -ne $resource.rawSize -or
+            $compressed[0].SHA256 -ne $resource.checksum -or $compressed[0].Length -ne $resource.size) {
+            throw 'Official VM origin hashes do not match the verified payload.'
+        }
+    }
+}
 Write-Host 'Payload checksums verified.' -ForegroundColor Green
 if ($VerifyOnly) { return }
 if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'Windows x64 is required.' }
@@ -68,6 +93,11 @@ foreach ($item in $manifest) {
     $destination = Join-Path $stage $item.Name
     Copy-Item -LiteralPath (Join-Path $payload $item.Name) -Destination $destination
     if ((Get-FileHash -LiteralPath $destination).Hash -ne $item.SHA256) { throw "Staged copy failed: $($item.Name)" }
+}
+if ($origin) {
+    foreach ($resource in $origin.files) {
+        [IO.File]::WriteAllText((Join-Path $stage ('.' + $resource.name + '.origin')), [string]$origin.sha, [Text.Encoding]::ASCII)
+    }
 }
 # Recheck just before the directory swap in case Claude was opened during copying.
 if (Get-Process -Name Claude, 'claude-desktop', 'cowork' -ErrorAction SilentlyContinue) {
