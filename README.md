@@ -9,6 +9,8 @@
 
 > **非官方项目，与 Anthropic 无隶属关系。** 不修改官方 MSIX，不是汉化补丁，不绕过登录、订阅或其他服务限制。离线安装资源不代表 Claude 服务可以离线使用。
 
+**开发者工具推荐：** [TeamoRouter · 多模型 API](https://teamorouter.com/?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=header_api) · [下载 Teamo 客户端](https://teamorouter.com/download?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=header_app)
+
 ## 下载
 
 本次构建日期：**2026-11-10**。版本号记录本次核实结果，不代表后续官方版本不会更新。
@@ -20,6 +22,19 @@
 | 构建信息与发布说明 | 安装范围、验证记录及限制 | [GitHub Release](https://github.com/urrrich/claude-windows-pack/releases/tag/v4.23118.1.0) |
 
 **GitHub Release 不提供 VM 镜像或 VM 安装器。** VM 由维护者独立上传[百度网盘](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)，提取码：`vnxa`。源码仓库只跟踪原创脚本、启动器、文档和测试，不提交官方二进制、镜像、图标或用户数据。
+
+## 开发者工具推荐 · Teamo
+
+**装好客户端，也为下一步 AI 开发准备好工具。**
+
+如果你还需要接入多模型 API，或配置本地 AI 编程工具，可以了解 TeamoRouter 与 Teamo 客户端：
+
+| 你的需求 | 推荐入口 |
+| --- | --- |
+| 查看模型、接入 API，为自己的应用添加 AI 能力 | **[了解 TeamoRouter](https://teamorouter.com/?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_api)** · [API 接入文档](https://teamorouter.com/docs/api-integration?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_docs) |
+| 使用桌面界面配置本地 AI 代理、切换模型 | **[下载 Teamo 客户端 · Windows / macOS](https://teamorouter.com/download?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_app)** |
+
+Teamo 是独立的可选产品，其账号、API 计费和功能范围以官网为准。本项目的 Claude 安装包不依赖 Teamo；Teamo 的 API 服务不等同于 Claude Desktop / Cowork 的账号订阅或功能授权。
 
 ## 快速安装
 
