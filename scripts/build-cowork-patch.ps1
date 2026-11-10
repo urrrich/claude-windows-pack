@@ -3,7 +3,8 @@ param(
     [string]$Source = (Join-Path $env:LOCALAPPDATA 'Claude-3p\vm_bundles\claudevm.bundle'),
     [string]$Output = (Join-Path $PSScriptRoot ("..\releases\Cowork-VM-Patch-" + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-x64')),
     [switch]$CreateInstaller,
-    [string]$IconPath
+    [string]$IconPath,
+    [string]$OfficialVmManifest
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\Packaging.Common.ps1')
@@ -14,6 +15,11 @@ Copy-VMResources $Source $Output
 foreach ($name in @('Install-Cowork-VM.cmd', 'Install-Cowork-VM.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "install\$name") -Destination $Output
 }
+if ($OfficialVmManifest) {
+    Assert-PlainPath $OfficialVmManifest
+    Copy-Item -LiteralPath $OfficialVmManifest -Destination (Join-Path $Output 'VM-ORIGIN.json')
+    & (Join-Path $PSScriptRoot 'install\Install-Cowork-VM.ps1') -PackageDirectory $Output -VerifyOnly
+}
 @(
     'Cowork VM offline patch - Windows x64'
     "Local runtime snapshot built at $([DateTime]::UtcNow.ToString('o')). Not independently verified as the latest VM release."
@@ -21,7 +27,8 @@ foreach ($name in @('Install-Cowork-VM.cmd', 'Install-Cowork-VM.ps1')) {
     'Run as the Windows user who uses Claude Desktop; administrator elevation is not required.'
     'Install Claude Desktop first and fully exit Claude/Cowork before applying.'
     'Existing VM is retained as a backup. Existing sessiondata.vhdx prevents installation.'
-    'Only seven allowlisted VM resources are included. No sessions, credentials, origin or repair markers.'
+    'Only seven allowlisted VM resources are included. No sessions, credentials or copied origin/repair markers.'
+    'With a verified official VM manifest, the installer generates version-origin markers after checking all declared hashes.'
     'This patch does not enable Windows virtualization features or configure account access.'
     'Verification only: powershell -NoProfile -ExecutionPolicy Bypass -File Install-Cowork-VM.ps1 -VerifyOnly'
 ) | Set-Content -LiteralPath (Join-Path $Output 'README.txt') -Encoding ASCII
