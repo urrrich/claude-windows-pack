@@ -16,10 +16,10 @@
 | 组件 | 版本 / 大小 | 下载渠道 |
 | --- | --- | --- |
 | Claude Desktop | `4.23118.1.0` · 532.49 MiB | **[下载安装器](https://github.com/urrrich/claude-windows-pack/releases/download/v4.23118.1.0/Claude-Desktop-4.23118.1.0.exe)** · [SHA-256](https://github.com/urrrich/claude-windows-pack/releases/download/v4.23118.1.0/Claude-Desktop-4.23118.1.0.exe.sha256) |
-| Cowork VM 补丁 | `072b6cbfe74f…` · ZIP 约 2.95 GiB | **百度网盘：待维护者上传并补充分享链接** |
+| Cowork VM 补丁 | `072b6cbfe74f…` · ZIP 约 2.95 GiB | **[百度网盘下载](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)** · 提取码：`vnxa` |
 | 构建信息与发布说明 | 安装范围、验证记录及限制 | [GitHub Release](https://github.com/urrrich/claude-windows-pack/releases/tag/v4.23118.1.0) |
 
-**GitHub Release 不提供 VM 镜像或 VM 安装器。** VM 由维护者独立上传百度网盘；分享链接尚未提供。源码仓库只跟踪原创脚本、启动器、文档和测试，不提交官方二进制、镜像、图标或用户数据。
+**GitHub Release 不提供 VM 镜像或 VM 安装器。** VM 由维护者独立上传[百度网盘](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)，提取码：`vnxa`。源码仓库只跟踪原创脚本、启动器、文档和测试，不提交官方二进制、镜像、图标或用户数据。
 
 ## 快速安装
 
