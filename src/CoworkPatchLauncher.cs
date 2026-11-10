@@ -58,16 +58,17 @@ internal class CoworkPatchLauncher : Form
         {
             await Task.Run(delegate
             {
-                string archive = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, package + ".zip");
-                if (!File.Exists(archive)) throw new IOException("\u8bf7\u5c06 EXE \u548c " + package + ".zip \u653e\u5728\u540c\u4e00\u76ee\u5f55\u3002");
-                using (var expected = new StreamReader(typeof(CoworkPatchLauncher).Assembly.GetManifestResourceStream("ArchiveHash")))
-                using (var input = File.OpenRead(archive))
-                using (var sha = SHA256.Create())
+                int partCount;
+                long archiveSize;
+                string expectedHash;
+                using (var metadata = new StreamReader(typeof(CoworkPatchLauncher).Assembly.GetManifestResourceStream("ArchiveParts")))
                 {
-                    string hash = BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "");
-                    if (!String.Equals(hash, expected.ReadToEnd().Trim(), StringComparison.OrdinalIgnoreCase))
-                        throw new IOException("\u538b\u7f29\u5305\u6821\u9a8c\u5931\u8d25\uff0c\u8bf7\u91cd\u65b0\u83b7\u53d6\u5b8c\u6574\u6587\u4ef6\u3002");
+                    partCount = Int32.Parse(metadata.ReadLine());
+                    archiveSize = Int64.Parse(metadata.ReadLine());
                 }
+                using (var expected = new StreamReader(typeof(CoworkPatchLauncher).Assembly.GetManifestResourceStream("ArchiveHash")))
+                    expectedHash = expected.ReadToEnd().Trim();
+                string archive = PrepareArchive(AppDomain.CurrentDomain.BaseDirectory, staging, package, partCount, archiveSize, expectedHash);
                 long expanded = 0;
                 using (var zip = ZipFile.OpenRead(archive))
                     foreach (var entry in zip.Entries) expanded = checked(expanded + entry.Length);
@@ -114,6 +115,54 @@ internal class CoworkPatchLauncher : Form
             busy = false;
             progress.Style = ProgressBarStyle.Blocks;
         }
+    }
+
+    // Split files are concatenated verbatim; the embedded SHA-256 authenticates the complete ZIP.
+    static string PrepareArchive(string directory, string staging, string name, int count, long size, string expectedHash)
+    {
+        if (!Regex.IsMatch(name, @"^[A-Za-z0-9][A-Za-z0-9._-]+$") || count < 0 || count > 999 || size <= 0)
+            throw new InvalidDataException("Invalid archive metadata.");
+        string archive = Path.Combine(directory, name + ".zip");
+        if (!File.Exists(archive))
+        {
+            if (count == 0) throw new IOException("Keep the installer and its ZIP in the same directory.");
+            long total = 0;
+            for (int i = 1; i <= count; i++)
+            {
+                string part = archive + "." + i.ToString("D3");
+                AssertPlainPath(part);
+                if (!File.Exists(part)) throw new IOException("Missing archive part: " + Path.GetFileName(part));
+                total = checked(total + new FileInfo(part).Length);
+            }
+            if (total != size) throw new IOException("Archive parts have an unexpected total size.");
+            AssertPlainPath(staging);
+            if (new DriveInfo(Path.GetPathRoot(staging)).AvailableFreeSpace < checked(size + 512L * 1024 * 1024))
+                throw new IOException("Not enough temporary disk space to combine archive parts.");
+            Directory.CreateDirectory(staging);
+            string combined = Path.Combine(staging, "payload.zip");
+            using (var output = new FileStream(combined, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                for (int i = 1; i <= count; i++)
+                    using (var input = File.OpenRead(archive + "." + i.ToString("D3"))) input.CopyTo(output);
+            archive = combined;
+        }
+        AssertPlainPath(archive);
+        if (new FileInfo(archive).Length != size) throw new IOException("Archive size mismatch.");
+        using (var input = File.OpenRead(archive))
+        using (var sha = SHA256.Create())
+        {
+            string hash = BitConverter.ToString(sha.ComputeHash(input)).Replace("-", "");
+            if (!String.Equals(hash, expectedHash, StringComparison.OrdinalIgnoreCase))
+                throw new IOException("Archive SHA-256 mismatch. Download the complete files again.");
+        }
+        return archive;
+    }
+
+    static void AssertPlainPath(string path)
+    {
+        for (string current = Path.GetFullPath(path); !String.IsNullOrEmpty(current); current = Path.GetDirectoryName(current))
+            if ((File.Exists(current) || Directory.Exists(current)) &&
+                (File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0)
+                throw new IOException("Reparse points are not supported: " + current);
     }
 
     static void DeletePlainDirectory(string path)
