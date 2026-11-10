@@ -23,6 +23,8 @@
 
 **GitHub Release 不提供 VM 镜像或 VM 安装器。** VM 由维护者独立上传[百度网盘](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)，提取码：`vnxa`。源码仓库只跟踪原创脚本、启动器、文档和测试，不提交官方二进制、镜像、图标或用户数据。
 
+> **Cowork 兼容性警告（2026-11-10）：** 已发现同版本的非 MSIX/Squirrel Desktop 安装显示“Cowork requires a newer installation”。该客户端启动时会判定 VM 不受支持，并删除预置的解压资源。安装补丁成功不代表 Cowork 可用。请先确认实际运行的是受支持的官方 Desktop 安装；不要反复覆盖 VM，也不要把此补丁当成解除客户端限制的办法。当前发布尚未通过真实 Cowork 启动验证。
+
 ## 开发者工具推荐 · Teamo
 
 **装好客户端，也为下一步 AI 开发准备好工具。**
@@ -58,6 +60,8 @@ Cowork-VM-072b6cbfe74f-20261110-x64.zip
 ### 3. 登录并检查运行条件
 
 仍需有效 Claude 登录、相应功能权限与可访问服务的网络；Cowork 还需符合官方要求的 Windows 虚拟化环境。两包安装完成仅代表本次打包资源已部署，不能保证所有机器上功能立即可用。客户端可能继续下载 Code 或其他资源，也可能更新 VM。
+
+若遇到“Cowork requires a newer installation”，先在 Windows PowerShell 5.1 中运行 `Get-AppxPackage -Name Claude | Select-Object Name, Version`，并检查当前运行进程的安装路径。`Get-AppxPackage` 没有结果、进程位于 `%LOCALAPPDATA%\AnthropicClaude\app-*` 时，是另一种安装形态；应按客户端提示使用可信官方安装渠道重新安装并核实 Cowork 支持状态。重新安装可能影响用户级配置，请先自行备份；本项目不会代为卸载或删除用户数据。若官方安装仍提示不支持，应以官方要求和账号可用性为准。
 
 ## 完整性与验证范围
 
