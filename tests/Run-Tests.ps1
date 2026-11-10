@@ -57,6 +57,29 @@ Must-Fail { & $vmInstaller -PackageDirectory $patch -VerifyOnly } 'Unexpected or
 [IO.File]::WriteAllText($manifestPath, $originalManifest)
 Write-Host 'VM allowlist, checksum and traversal guards: PASS'
 
+# Synthetic metadata exercises origin validation without trusting real account or VM state.
+$originRevision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+$originFiles = foreach ($name in @('rootfs.vhdx', 'vmlinuz', 'initrd')) {
+    [ordered]@{name=$name; rawChecksum=(Get-FileHash -LiteralPath (Join-Path $source $name)).Hash;
+        rawSize=(Get-Item -LiteralPath (Join-Path $source $name)).Length;
+        checksum=(Get-FileHash -LiteralPath (Join-Path $source ($name + '.zst'))).Hash;
+        size=(Get-Item -LiteralPath (Join-Path $source ($name + '.zst'))).Length}
+}
+$originFixture = [ordered]@{sha=$originRevision; baseUrl=('https://downloads.claude.ai/vms/linux/x64/' + $originRevision); files=@($originFiles)}
+$originFixturePath = Join-Path $testRoot 'official-manifest-fixture.json'
+$originFixture | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $originFixturePath -Encoding ASCII
+$originPatch = Join-Path $testRoot 'origin-patch'
+& (Join-Path $scripts 'build-cowork-patch.ps1') -Source $source -Output $originPatch -OfficialVmManifest $originFixturePath
+$originPath = Join-Path $patch 'VM-ORIGIN.json'
+Copy-Item -LiteralPath (Join-Path $originPatch 'VM-ORIGIN.json') -Destination $originPath
+$originText = [IO.File]::ReadAllText($originPath)
+$badOrigin = $originText | ConvertFrom-Json
+$badOrigin.files[0].rawChecksum = ('0' * 64)
+$badOrigin | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $originPath -Encoding ASCII
+Must-Fail { & $vmInstaller -PackageDirectory $patch -VerifyOnly } 'origin hashes'
+[IO.File]::WriteAllText($originPath, $originText)
+Write-PackageChecksums $patch
+
 # Mock the OS probes and redirect LocalAppData into the fixture directory.
 $savedLocal = $env:LOCALAPPDATA
 function Get-AppxPackage { param($Name) [pscustomobject]@{Name='Claude'} }
@@ -68,6 +91,9 @@ try {
     [IO.File]::WriteAllText((Join-Path $target 'old.txt'), 'preserve old VM')
     & $vmInstaller -PackageDirectory $patch
     Assert (Test-Path -LiteralPath (Join-Path $target 'rootfs.vhdx')) 'VM not installed in fixture target.'
+    foreach ($name in @('rootfs.vhdx', 'vmlinuz', 'initrd')) {
+        Assert (([IO.File]::ReadAllText((Join-Path $target ('.' + $name + '.origin')))) -ceq $originRevision) 'Verified origin marker was not generated.'
+    }
     $backups = @(Get-ChildItem -LiteralPath (Split-Path $target -Parent) -Directory -Filter 'claudevm.backup-*')
     Assert ($backups.Count -eq 1) 'Old VM was not backed up.'
     Assert (Test-Path -LiteralPath (Join-Path $backups[0].FullName 'old.txt')) 'Backup contents lost.'
@@ -80,7 +106,7 @@ try {
 }
 Write-Host 'Synthetic installation, backup and session protection: PASS'
 
-& (Join-Path $scripts 'build-cowork-installer.ps1') -PatchDirectory $patch
+& (Join-Path $scripts 'build-cowork-installer.ps1') -PatchDirectory $patch -MaxArchivePartBytes 512
 $installerDir = "$patch-Installer"
 $assembly = [Reflection.Assembly]::LoadFile((Join-Path $installerDir 'Install-Cowork-VM.exe'))
 Add-Type -AssemblyName System.Windows.Forms
@@ -100,6 +126,30 @@ try {
     }
 } finally { $zip.Dispose() }
 Write-Host 'Cowork EXE compilation, GUI and ZIP integrity: PASS'
+
+# Exercise exactly the split files users download, without installing into a real profile.
+$partDirectory = Join-Path $testRoot 'downloaded parts'
+New-Item -ItemType Directory -Path $partDirectory | Out-Null
+$parts = @(Get-ChildItem -LiteralPath $installerDir -File | Where-Object { $_.Name -match '\.zip\.\d{3}$' } | Sort-Object Name)
+Assert ($parts.Count -gt 1) 'Split archive fixture was not created.'
+foreach ($part in $parts) { Copy-Item -LiteralPath $part.FullName -Destination $partDirectory }
+$archiveFile = Join-Path $installerDir 'fixture-patch.zip'
+$archiveHash = (Get-FileHash -LiteralPath $archiveFile).Hash
+$archiveLength = (Get-Item -LiteralPath $archiveFile).Length
+$prepare = $assembly.GetType('CoworkPatchLauncher').GetMethod('PrepareArchive', [Reflection.BindingFlags]'NonPublic, Static')
+$combined = $prepare.Invoke($null, @([string]$partDirectory, [string](Join-Path $testRoot 'combine'), 'fixture-patch', [int]$parts.Count, [long]$archiveLength, [string]$archiveHash))
+Assert ((Get-FileHash -LiteralPath $combined).Hash -eq $archiveHash) 'Split archive round trip failed.'
+$missingDirectory = Join-Path $testRoot 'missing parts'
+New-Item -ItemType Directory -Path $missingDirectory | Out-Null
+Copy-Item -LiteralPath $parts[0].FullName -Destination $missingDirectory
+Must-Fail { $prepare.Invoke($null, @([string]$missingDirectory, [string](Join-Path $testRoot 'missing-stage'), 'fixture-patch', [int]$parts.Count, [long]$archiveLength, [string]$archiveHash)) } 'Missing archive part'
+$badPart = Join-Path $partDirectory $parts[0].Name
+$badBytes = [IO.File]::ReadAllBytes($badPart)
+$badBytes[0] = $badBytes[0] -bxor 255
+[IO.File]::WriteAllBytes($badPart, $badBytes)
+Must-Fail { $prepare.Invoke($null, @([string]$partDirectory, [string](Join-Path $testRoot 'tampered-stage'), 'fixture-patch', [int]$parts.Count, [long]$archiveLength, [string]$archiveHash)) } 'SHA-256 mismatch'
+Write-Host 'Split archive assembly, missing-part and corruption guards: PASS'
+
 
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $desktop = Join-Path $testRoot 'DesktopFixture.exe'
