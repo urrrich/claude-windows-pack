@@ -21,6 +21,20 @@ function Assert-AnthropicSignature([string]$Path) {
     }
 }
 
+function Assert-ClaudeBootstrapper([string]$Path) {
+    Assert-AnthropicSignature $Path
+    $file = Get-Item -LiteralPath $Path
+    # The signed Squirrel desktop EXE is not the Setup bootstrapper.
+    if ($file.VersionInfo.FileDescription -ne 'Claude Setup') {
+        throw 'Expected the official Claude Setup bootstrapper from setup/latest/redirect, not exe/latest/redirect.'
+    }
+    $bytes = [IO.File]::ReadAllBytes($file.FullName)
+    $content = [Text.Encoding]::UTF8.GetString($bytes)
+    $wideContent = [Text.Encoding]::Unicode.GetString($bytes)
+    if (-not $content.Contains('local-msix') -and -not $wideContent.Contains('local-msix')) {
+        throw 'Official Setup does not expose the expected local-msix option; review compatibility before building.'
+    }
+}
 function Get-CodeRuntime([string]$Root) {
     $directory = Get-ChildItem -LiteralPath (Join-Path $Root 'claude-code') -Directory |
         Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } |
