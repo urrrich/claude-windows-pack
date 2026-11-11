@@ -81,9 +81,7 @@ internal class CoworkPatchLauncher : Form
                     throw new IOException("\u78c1\u76d8\u7a7a\u95f4\u4e0d\u8db3\uff0c\u9700\u8981\u4e3a\u89e3\u538b\u548c\u5b89\u88c5\u5404\u9884\u7559\u4e00\u4efd VM \u7a7a\u95f4\u3002");
                 ZipFile.ExtractToDirectory(archive, staging);
                 string script = Path.Combine(staging, package, "Install-Cowork-VM.ps1");
-                var start = new ProcessStartInfo(
-                    Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
-                    "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script + "\"");
+                var start = CreateInstallStartInfo(script);
                 start.UseShellExecute = false;
                 start.CreateNoWindow = true;
                 start.RedirectStandardOutput = true;
@@ -117,6 +115,15 @@ internal class CoworkPatchLauncher : Form
         }
     }
 
+    // Pass the directory explicitly, including for ZIPs containing older scripts.
+    static ProcessStartInfo CreateInstallStartInfo(string script)
+    {
+        script = Path.GetFullPath(script);
+        return new ProcessStartInfo(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
+            "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File \"" + script +
+            "\" -PackageDirectory \"" + Path.GetDirectoryName(script) + "\"");
+    }
     // Split files are concatenated verbatim; the embedded SHA-256 authenticates the complete ZIP.
     static string PrepareArchive(string directory, string staging, string name, int count, long size, string expectedHash)
     {

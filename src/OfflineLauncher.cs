@@ -35,13 +35,14 @@ internal static class OfflineLauncher
                 Path.Combine(directory, "Claude Setup.exe"),
                 "-local-msix \"" + Path.Combine(directory, "Claude-x64.msix") + "\"");
             start.UseShellExecute = true;
-            start.Verb = "runas";
+
             using (Process process = Process.Start(start))
             {
                 process.WaitForExit();
                 if (process.ExitCode != 0)
                     throw new InvalidOperationException("Claude Setup exited with code " + process.ExitCode);
             }
+            VerifyInstalledMsix();
             if (includesCode)
             {
                 string version = FileVersionInfo.GetVersionInfo(code).ProductVersion;
@@ -64,6 +65,31 @@ internal static class OfflineLauncher
         }
     }
 
+    // Probe registration in the invoking user's context after the official Setup exits.
+    private static void VerifyInstalledMsix()
+    {
+        var probe = new ProcessStartInfo(
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"WindowsPowerShell\v1.0\powershell.exe"),
+            "-NoProfile -NonInteractive -Command \"$p = Get-AppxPackage -Name Claude -ErrorAction Stop; " +
+            "if ($p) { $p | Select-Object -ExpandProperty Version }\"");
+        probe.UseShellExecute = false;
+        probe.CreateNoWindow = true;
+        probe.RedirectStandardOutput = true;
+        probe.RedirectStandardError = true;
+        using (var process = Process.Start(probe))
+        {
+            string output = process.StandardOutput.ReadToEnd();
+            string error = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+            string expected = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            if (process.ExitCode != 0 || !String.Equals(output.Trim(), expected, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException(
+                    "Official Setup returned, but Claude MSIX " + expected + " is not registered for this Windows user. " +
+                    "Do not install the Cowork VM patch yet. Check the official Setup log and the account used for elevation. " +
+                    "Detected package version: " + (String.IsNullOrWhiteSpace(output) ? "none" : output.Trim()) +
+                    (String.IsNullOrWhiteSpace(error) ? "" : "; probe error: " + error.Trim()));
+        }
+    }
     private static void Extract(string resource, string destination)
     {
         using (Stream input = Assembly.GetExecutingAssembly().GetManifestResourceStream(resource))
