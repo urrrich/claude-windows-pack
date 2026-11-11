@@ -1,9 +1,11 @@
 [CmdletBinding()]
 param(
     [switch]$VerifyOnly,
-    [string]$PackageDirectory = $PSScriptRoot
+    [string]$PackageDirectory
 )
 $ErrorActionPreference = 'Stop'
+# Resolve the default after Windows PowerShell 5.1 has bound script parameters.
+if (-not $PSBoundParameters.ContainsKey('PackageDirectory')) { $PackageDirectory = $PSScriptRoot }
 function Assert-PlainPath([string]$Path) {
     $cursor = [IO.Path]::GetFullPath($Path)
     while ($cursor) {
@@ -63,6 +65,19 @@ if (Test-Path -LiteralPath $originPath) {
         }
     }
 }
+$linuxCode = $null
+$codePayload = Join-Path $PackageDirectory 'payload\claude-code-vm'
+if (Test-Path -LiteralPath $codePayload) {
+    Assert-PlainPath $codePayload
+    $codeFiles = @(Get-ChildItem -LiteralPath $codePayload -Force)
+    if ($codeFiles.Count -ne 2 -or ($codeFiles | Where-Object { $_.PSIsContainer -or $_.Name -cnotin @('claude', 'LINUX-CODE.json') })) { throw 'Unexpected Linux Code files.' }
+    foreach ($file in $codeFiles) { Assert-PlainPath $file.FullName }
+    $linuxCode = Get-Content -LiteralPath (Join-Path $codePayload 'LINUX-CODE.json') -Raw | ConvertFrom-Json
+    if ($linuxCode.Version -notmatch '^\d+\.\d+\.\d+$' -or $linuxCode.Platform -cne 'linux-x64' -or
+        $linuxCode.SHA256 -notmatch '^[a-f0-9]{64}$' -or $linuxCode.ArchiveSHA256 -notmatch '^[a-f0-9]{64}$' -or $linuxCode.Length -le 0) { throw 'Invalid Linux Code metadata.' }
+    $codeBinary = Join-Path $codePayload 'claude'
+    if ((Get-Item -LiteralPath $codeBinary).Length -ne $linuxCode.Length -or (Get-FileHash -LiteralPath $codeBinary).Hash -ne $linuxCode.SHA256) { throw 'Linux Code checksum failed.' }
+}
 Write-Host 'Payload checksums verified.' -ForegroundColor Green
 if ($VerifyOnly) { return }
 if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'Windows x64 is required.' }
@@ -75,6 +90,14 @@ if (-not (Get-AppxPackage -Name Claude)) { throw 'Install Claude Desktop for thi
 if (Get-Process -Name Claude, 'claude-desktop', 'cowork' -ErrorAction SilentlyContinue) {
     throw 'Exit Claude Desktop and Cowork completely, then run this patch again.'
 }
+if ($linuxCode) {
+    $codeParent = Join-Path $env:LOCALAPPDATA 'Claude-3p\claude-code-vm'
+    $codeTarget = Join-Path $codeParent $linuxCode.Version
+    Assert-PlainPath $codeTarget
+    if (Test-Path -LiteralPath $codeTarget) {
+        Get-ChildItem -LiteralPath $codeTarget -Recurse -Force | ForEach-Object { Assert-PlainPath $_.FullName }
+    }
+}
 $parent = Join-Path $env:LOCALAPPDATA 'Claude-3p\vm_bundles'
 $target = Join-Path $parent 'claudevm.bundle'
 Assert-PlainPath $target
@@ -84,6 +107,7 @@ if (Test-Path -LiteralPath (Join-Path $target 'sessiondata.vhdx')) {
 New-Item -ItemType Directory -Path $parent -Force | Out-Null
 $drive = Get-PSDrive -Name ([IO.Path]::GetPathRoot($parent).Substring(0,1))
 $required = ($manifest | Measure-Object Length -Sum).Sum + 512MB
+if ($linuxCode) { $required += $linuxCode.Length }
 if ($drive.Free -lt $required) { throw 'Insufficient disk space for staged installation.' }
 $suffix = [guid]::NewGuid().ToString('N')
 $stage = Join-Path $parent "claudevm.staging-$suffix"
@@ -112,6 +136,28 @@ try {
 } catch {
     if ($hadTarget) { Rename-Item -LiteralPath $backup -NewName 'claudevm.bundle' }
     throw
+}
+if ($linuxCode) {
+    New-Item -ItemType Directory -Path $codeParent -Force | Out-Null
+    $codeStage = Join-Path $codeParent ('code-stage-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $codeStage | Out-Null
+    Copy-Item -LiteralPath $codeBinary -Destination (Join-Path $codeStage 'claude')
+    if ((Get-FileHash -LiteralPath (Join-Path $codeStage 'claude')).Hash -ne $linuxCode.SHA256) { throw 'Staged Linux Code checksum failed.' }
+    [IO.File]::WriteAllText((Join-Path $codeStage '.payload'), (@{sha256=$linuxCode.SHA256; size=$linuxCode.Length} | ConvertTo-Json), [Text.Encoding]::ASCII)
+    [IO.File]::WriteAllText((Join-Path $codeStage '.verified'), $linuxCode.ArchiveSHA256, [Text.Encoding]::ASCII)
+    if (Get-Process -Name Claude, 'claude-desktop', 'cowork' -ErrorAction SilentlyContinue) { throw 'Claude started during installation; Linux Code staging retained.' }
+    Assert-PlainPath $codeTarget
+    $codeBackup = $null
+    if (Test-Path -LiteralPath $codeTarget) {
+        $codeBackup = $linuxCode.Version + '.backup-' + [guid]::NewGuid().ToString('N')
+        Rename-Item -LiteralPath $codeTarget -NewName $codeBackup
+    }
+    try { Rename-Item -LiteralPath $codeStage -NewName $linuxCode.Version } catch {
+        if ($codeBackup) { Rename-Item -LiteralPath (Join-Path $codeParent $codeBackup) -NewName $linuxCode.Version }
+        throw
+    }
+    Write-Host "Linux Code installed: $codeTarget"
+    if ($codeBackup) { Write-Host "Previous Linux Code retained: $codeBackup" }
 }
 Write-Host "Cowork VM installed: $target" -ForegroundColor Green
 if ($hadTarget) { Write-Host "Previous VM retained at: $backup" }
