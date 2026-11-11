@@ -20,12 +20,12 @@
 | 组件 | 版本 / 大小 | 下载渠道 |
 | --- | --- | --- |
 | Desktop + Windows Code | Desktop 5.1231.2.0 + Code 2.1.322 · 621.47 MiB | **[下载安装器](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe)** · [SHA-256](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe.sha256) |
-| Cowork VM + Linux Code | VM 072b6cbfe74f… + Linux Code 2.1.321 · ZIP 3.07 GiB | 新版已打包，**网盘上传待完成** |
+| Cowork VM + Linux Code | VM 072b6cbfe74f… + Linux Code 2.1.321 · ZIP 3.07 GiB | **[百度网盘下载](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)** · 提取码 `vnxa` |
 | 发布说明 | 安装步骤、验证范围 | [GitHub 预发布](https://github.com/urrrich/claude-windows-pack/releases/tag/v5.1231.2.0-rc.1) |
 
-**VM 不上传 GitHub。** [原百度网盘链接](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)（提取码 vnxa）尚未确认更新，不应将旧文件当作新版。新版应包含 Install-Cowork-VM.exe 和 Cowork-VM-Code-2.1.321-20261111-x64.zip；请核对文件名及随包 SHA-256。源码仓库不提交官方二进制、镜像、图标或用户数据。
+**VM 通过百度网盘分发，不上传 GitHub。** 下载时请同时保存 `Install-Cowork-VM.exe` 和 `Cowork-VM-Code-2.1.321-20261111-x64.zip`，放在同一目录，并核对随包 SHA-256；文件名不符时请勿当作本次新版安装。源码仓库不提交官方二进制、镜像、图标或用户数据。
 
-### Cowork VM + Linux Code 离线补丁（本地候选）
+### Cowork VM + Linux Code 离线补丁
 
 Desktop + Windows Code 单 EXE 与 Cowork 补丁分开发放。`5.1231.2.0` 当前要求的 VM Code 为 Linux x64 `2.1.321`；Windows Code `2.1.322` 不能替代它。新的 VM 补丁可包含这份 Linux 二进制，安装时按哈希核验并生成 `.payload`、`.verified`，不复制用户缓存或标记，也不改写账号配置。已有 Linux Code 保留备份，已有 VM 会话盘仍会阻止安装。
 
