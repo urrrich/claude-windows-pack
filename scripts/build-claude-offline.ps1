@@ -58,13 +58,13 @@ New-Item -ItemType Directory -Force $outDir | Out-Null
 
 $setupOut = Join-Path $outDir 'Claude Setup.exe'
 $msixOut = Join-Path $outDir 'Claude-x64.msix'
-Assert-AnthropicSignature $SetupPath
+Assert-ClaudeBootstrapper $SetupPath
 if ([IO.Path]::GetFullPath($SetupPath) -ne $setupOut) {
     Copy-Item -LiteralPath $SetupPath -Destination $setupOut -Force
 }
 if (-not ($ReuseMsix -and (Test-Path -LiteralPath $msixOut))) {
     Write-Host "Downloading Claude Desktop $version..."
-    $partial = "$msixOut.$([guid]::NewGuid().ToString('N')).partial"
+    $partial = "$msixOut.$([guid]::NewGuid().ToString('N')).partial.msix"
     Invoke-WebRequest -UseBasicParsing -Uri $resolved -OutFile $partial
     Assert-AnthropicSignature $partial
     Move-Item -LiteralPath $partial -Destination $msixOut -Force
@@ -95,7 +95,7 @@ foreach ($file in @($installer, $msix)) {
     }
 }
 if ([Environment]::OSVersion.Version.Build -lt 18362) { throw 'Claude requires Windows 10 build 18362 or newer.' }
-$process = Start-Process -FilePath $installer -ArgumentList @('-local-msix', ('"{0}"' -f $msix)) -Verb RunAs -Wait -PassThru
+$process = Start-Process -FilePath $installer -ArgumentList @('-local-msix', ('"{0}"' -f $msix)) -Wait -PassThru
 if ($process.ExitCode -ne 0) { throw "Claude Setup exited with code $($process.ExitCode)" }
 Write-Host 'Claude Desktop installation completed.' -ForegroundColor Green
 '@
@@ -144,6 +144,8 @@ if (-not $NoExe) {
 $buildInfo = [ordered]@{
     DesktopVersion = $version
     MsixSource = $resolved
+    SetupSHA256 = (Get-FileHash -LiteralPath $setupOut -Algorithm SHA256).Hash
+    SetupDescription = (Get-Item -LiteralPath $setupOut).VersionInfo.FileDescription
     Architecture = 'x64'
     CodeVersion = $(if ($codeDir) { $codeDir.Name } else { $null })
     CoworkIncluded = [bool]$IncludeRuntime

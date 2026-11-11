@@ -21,6 +21,7 @@ if ($Output.StartsWith($PatchDirectory.TrimEnd('\') + '\', [StringComparison]::O
 if (Test-Path -LiteralPath $Output) { throw "Output already exists: $Output" }
 & (Join-Path $PSScriptRoot 'install\Install-Cowork-VM.ps1') -PackageDirectory $PatchDirectory -VerifyOnly
 $allowed = @('Install-Cowork-VM.ps1', 'Install-Cowork-VM.cmd', 'README.txt', 'SHA256SUMS.txt', 'VM-MANIFEST.json', 'VM-ORIGIN.json')
+$allowed += @('payload\claude-code-vm\claude', 'payload\claude-code-vm\LINUX-CODE.json')
 $allowed += @($VmFiles | ForEach-Object { "payload\claudevm.bundle\$_" })
 foreach ($file in (Get-ChildItem -LiteralPath $PatchDirectory -Recurse -File -Force)) {
     $relative = $file.FullName.Substring($PatchDirectory.TrimEnd('\').Length + 1)
