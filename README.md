@@ -13,17 +13,33 @@
 
 ## 下载
 
-本次构建日期：**2026-11-10**。版本号记录本次核实结果，不代表后续官方版本不会更新。
+> **旧包已弃用：** 4.23118.1.0 误用了 Squirrel EXE 作为 Setup，请勿继续安装。新版改用官方 Setup 引导器，并加入当前用户 MSIX 注册校验。
+
+本次候选构建：**2026-11-11**，标记为 **预发布**。资源签名、哈希和隔离测试已通过，尚未完成专用测试机真实安装及 Cowork 任务验证。
 
 | 组件 | 版本 / 大小 | 下载渠道 |
 | --- | --- | --- |
-| Claude Desktop | `4.23118.1.0` · 532.49 MiB | **[下载安装器](https://github.com/urrrich/claude-windows-pack/releases/download/v4.23118.1.0/Claude-Desktop-4.23118.1.0.exe)** · [SHA-256](https://github.com/urrrich/claude-windows-pack/releases/download/v4.23118.1.0/Claude-Desktop-4.23118.1.0.exe.sha256) |
-| Cowork VM 补丁 | `072b6cbfe74f…` · ZIP 约 2.95 GiB | **[百度网盘下载](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)** · 提取码：`vnxa` |
-| 构建信息与发布说明 | 安装范围、验证记录及限制 | [GitHub Release](https://github.com/urrrich/claude-windows-pack/releases/tag/v4.23118.1.0) |
+| Desktop + Windows Code | Desktop 5.1231.2.0 + Code 2.1.322 · 621.47 MiB | **[下载安装器](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe)** · [SHA-256](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe.sha256) |
+| Cowork VM + Linux Code | VM 072b6cbfe74f… + Linux Code 2.1.321 · ZIP 3.07 GiB | 新版已打包，**网盘上传待完成** |
+| 发布说明 | 安装步骤、验证范围 | [GitHub 预发布](https://github.com/urrrich/claude-windows-pack/releases/tag/v5.1231.2.0-rc.1) |
 
-**GitHub Release 不提供 VM 镜像或 VM 安装器。** VM 由维护者独立上传[百度网盘](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)，提取码：`vnxa`。源码仓库只跟踪原创脚本、启动器、文档和测试，不提交官方二进制、镜像、图标或用户数据。
+**VM 不上传 GitHub。** [原百度网盘链接](https://pan.baidu.com/s/1vUgumghR7qDs-15IPNc2EA?pwd=vnxa)（提取码 vnxa）尚未确认更新，不应将旧文件当作新版。新版应包含 Install-Cowork-VM.exe 和 Cowork-VM-Code-2.1.321-20261111-x64.zip；请核对文件名及随包 SHA-256。源码仓库不提交官方二进制、镜像、图标或用户数据。
 
-> **Cowork 兼容性警告（2026-11-10）：** 已发现同版本的非 MSIX/Squirrel Desktop 安装显示“Cowork requires a newer installation”。该客户端启动时会判定 VM 不受支持，并删除预置的解压资源。安装补丁成功不代表 Cowork 可用。请先确认实际运行的是受支持的官方 Desktop 安装；不要反复覆盖 VM，也不要把此补丁当成解除客户端限制的办法。当前发布尚未通过真实 Cowork 启动验证。
+### Cowork VM + Linux Code 离线补丁（本地候选）
+
+Desktop + Windows Code 单 EXE 与 Cowork 补丁分开发放。`5.1231.2.0` 当前要求的 VM Code 为 Linux x64 `2.1.321`；Windows Code `2.1.322` 不能替代它。新的 VM 补丁可包含这份 Linux 二进制，安装时按哈希核验并生成 `.payload`、`.verified`，不复制用户缓存或标记，也不改写账号配置。已有 Linux Code 保留备份，已有 VM 会话盘仍会阻止安装。
+
+```powershell
+# 压缩哈希来自已验证 Desktop 中的内置清单；不能随意沿用到其他版本。
+.\scripts\get-cowork-code.ps1 -Version 2.1.321 `
+    -ArchiveSHA256 ded331c1fbf8bdd00518599ac80a888a1d1aff3c799f3a15934adb96662094ff `
+    -Output '.\build-runtime\cowork-code-input'
+.\scripts\build-cowork-patch.ps1 -Source 'C:\inputs\verified-vm' `
+    -LinuxCodeDirectory '.\build-runtime\cowork-code-input' `
+    -OfficialVmManifest 'C:\inputs\vm-manifest.json' -CreateInstaller
+```
+
+下载脚本需要支持 Zstandard 解压的 Node.js。只打包 Linux `claude` 和校验元数据；VM 的七文件白名单保持独立。客户端将来更新所需 Code 版本时，仍可能需要新补丁或联网下载。候选包尚未完成专用测试机真实安装和 Cowork 任务验证。
 
 ## 开发者工具推荐 · Teamo
 
@@ -42,17 +58,17 @@ Teamo 是独立的可选产品，其账号、API 计费和功能范围以官网�
 
 ### 1. 安装 Desktop
 
-下载 `Claude-Desktop-4.23118.1.0.exe`，以实际使用 Claude 的 Windows 用户双击运行。包装器解出原始官方安装资源，并通过官方 Setup 的 `-local-msix` 参数安装；按官方 Setup 提示提权，不要切换到另一个管理员账号安装用户级资源。
+下载 `Claude-Desktop-5.1231.2.0.exe`，以实际使用 Claude 的 Windows 用户双击运行。包装器解出原始官方安装资源，并通过官方 Setup 的 `-local-msix` 参数安装；按官方 Setup 提示提权，不要切换到另一个管理员账号安装用户级资源。
 
-本次 Desktop EXE 包含 **官方 Setup + MSIX**，不包含 Claude Code 原生运行时或 Cowork VM。
+本次 Desktop EXE 包含 **官方 Setup + MSIX + Windows Code 2.1.322**；Cowork VM 和 Linux Code 2.1.321 使用独立补丁安装。
 
 ### 2. 按需安装 Cowork VM
 
-从百度网盘下载以下两个文件，放在同一个文件夹，保留原文件名：
+待新版网盘上传完成后，下载以下两个文件，放在同一个文件夹，保留原文件名：
 
 ```text
 Install-Cowork-VM.exe
-Cowork-VM-072b6cbfe74f-20261110-x64.zip
+Cowork-VM-Code-2.1.321-20261111-x64.zip
 ```
 
 完全退出 Claude 后，双击 `Install-Cowork-VM.exe` 并点击安装。无需手动解压或运行 CMD。安装器会核对完整 ZIP 和逐文件哈希；已有 VM 保留备份，检测到已有会话盘时停止覆盖。请为解压、安装暂存和已有备份留足磁盘空间。
@@ -68,13 +84,13 @@ Cowork-VM-072b6cbfe74f-20261110-x64.zip
 在下载目录运行 PowerShell：
 
 ```powershell
-Get-FileHash -LiteralPath '.\Claude-Desktop-4.23118.1.0.exe' -Algorithm SHA256
+Get-FileHash -LiteralPath '.\Claude-Desktop-5.1231.2.0.exe' -Algorithm SHA256
 ```
 
 本次 Desktop 安装器预期 SHA-256：
 
 ```text
-43EB8DD354B89A39D270BDE80C77544847EC6B1549B75F2C8F26FA5AB2EBF607
+55486A3D1815BA9EAFAF88187DE35714258D900700AAE0263F1A830F982EE633
 ```
 
 VM 的校验清单和来源记录随网盘包提供。VM 版本为 `072b6cbfe74f428a98bd86035f83b322b369d1f1`，来自本次签名已验证的官方 Desktop 包所指定的清单（日期 `2026-10-22`），不宣称为独立核实的最新 VM。资源从官方地址全新下载，压缩文件和解压文件的大小与 SHA-256 均已核对；`smol-bin.vhdx` 来自同一官方 MSIX。
@@ -95,7 +111,7 @@ VM 的校验清单和来源记录随网盘包提供。VM 版本为 `072b6cbfe74f
 - Windows x64；构建使用 Windows PowerShell 5.1 或 PowerShell 7。
 - Windows 自带的 .NET Framework C# 编译器：`%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`。
 - 可访问官方发布源的网络；下载和代码签名验证可能需要联网。
-- 从可信官方渠道获取的 `Claude Setup.exe`，通过 `-SetupPath` 指定。
+- 从可信官方渠道获取的 `Claude Setup.exe`，通过 `-SetupPath` 指定。 必须是官网 Windows x64 按钮指向的 `https://claude.ai/api/desktop/win32/x64/setup/latest/redirect` 引导器；`exe/latest/redirect` 返回的桌面安装 EXE 不是它，不能仅改名后使用。
 - Cowork 另需来源已核实的干净 VM 资源，可从官方清单指定的地址获取，或使用已经验证且未包含用户状态的本机快照；项目不自动配置虚拟化。
 
 新构建默认写入已被 Git 忽略的 `releases/`。请在测试机验证后再分发；本仓库的自动测试不代表真实 VM 启动或安装兼容性认证。
