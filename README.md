@@ -62,6 +62,22 @@ Teamo 是独立的可选产品，其账号、API 计费和功能范围以官网�
 
 本次 Desktop EXE 包含 **官方 Setup + MSIX + Windows Code 2.1.322**；Cowork VM 和 Linux Code 2.1.321 使用独立补丁安装。
 
+### Workspace 后台服务修复
+
+**[下载 Cowork 服务修复包](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Repair-Cowork-Service-20261111.zip)** · 解压后运行，勿在 ZIP 内直接打开。
+
+若出现 `Claude’s workspace service isn’t running` 且重启无效，可使用 `scripts/install/Repair-Cowork-Service.ps1`。先保存工作并从托盘退出 Claude，再以**同一 Windows 账号**管理员身份运行 `scripts/install/Repair-Cowork-Service.cmd`；两个文件必须放在同一目录。不要切换到另一个管理员账号。
+
+脚本核对当前用户的官方 MSIX 身份、服务声明及服务文件签名。服务缺失时重新注册现有官方应用；服务已存在时尝试启动，并检查服务状态与通信管道。它不卸载应用、不结束 Claude 进程、不删除用户数据或 VM，也不修改官方文件。运行结果仅代表后台服务就绪，不代表 Cowork 任务已验证。
+
+只检查、不修复：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\install\Repair-Cowork-Service.ps1 -CheckOnly
+```
+
+此工具为独立源码脚本，已发布的 RC1 EXE 不会自动包含它。
+
 ### 2. 按需安装 Cowork VM
 
 待新版网盘上传完成后，下载以下两个文件，放在同一个文件夹，保留原文件名：
