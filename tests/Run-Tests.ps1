@@ -78,6 +78,22 @@ $badOrigin.files[0].rawChecksum = ('0' * 64)
 $badOrigin | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $originPath -Encoding ASCII
 Must-Fail { & $vmInstaller -PackageDirectory $patch -VerifyOnly } 'origin hashes'
 [IO.File]::WriteAllText($originPath, $originText)
+$linuxDir = Join-Path $patch 'payload\claude-code-vm'
+New-Item -ItemType Directory -Path $linuxDir | Out-Null
+$linuxBinary = Join-Path $linuxDir 'claude'
+[IO.File]::WriteAllText($linuxBinary, 'synthetic Linux Code fixture')
+$linuxMetadata = @{Version='2.1.321'; Platform='linux-x64'; Length=(Get-Item -LiteralPath $linuxBinary).Length; SHA256=(Get-FileHash -LiteralPath $linuxBinary).Hash.ToLowerInvariant(); ArchiveSHA256=('a' * 64)}
+$linuxMetaPath = Join-Path $linuxDir 'LINUX-CODE.json'
+$linuxMetadata | ConvertTo-Json | Set-Content -LiteralPath $linuxMetaPath -Encoding ASCII
+& $vmInstaller -PackageDirectory $patch -VerifyOnly
+[IO.File]::AppendAllText($linuxBinary, 'tamper')
+Must-Fail { & $vmInstaller -PackageDirectory $patch -VerifyOnly } 'Linux Code checksum'
+[IO.File]::WriteAllText($linuxBinary, 'synthetic Linux Code fixture')
+$linuxMetadata.Version = '../escape'
+$linuxMetadata | ConvertTo-Json | Set-Content -LiteralPath $linuxMetaPath -Encoding ASCII
+Must-Fail { & $vmInstaller -PackageDirectory $patch -VerifyOnly } 'Invalid Linux Code metadata'
+$linuxMetadata.Version = '2.1.321'
+$linuxMetadata | ConvertTo-Json | Set-Content -LiteralPath $linuxMetaPath -Encoding ASCII
 Write-PackageChecksums $patch
 
 # Mock the OS probes and redirect LocalAppData into the fixture directory.
@@ -89,7 +105,14 @@ try {
     $target = Join-Path $env:LOCALAPPDATA 'Claude-3p\vm_bundles\claudevm.bundle'
     New-Item -ItemType Directory -Path $target -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $target 'old.txt'), 'preserve old VM')
+    $linuxTarget = Join-Path $env:LOCALAPPDATA 'Claude-3p\claude-code-vm\2.1.321'
+    New-Item -ItemType Directory -Path $linuxTarget -Force | Out-Null
+    [IO.File]::WriteAllText((Join-Path $linuxTarget 'old.txt'), 'preserve old Code')
     & $vmInstaller -PackageDirectory $patch
+    Assert ((Get-FileHash -LiteralPath (Join-Path $linuxTarget 'claude')).Hash -eq $linuxMetadata.SHA256) 'Linux Code install mismatch.'
+    Assert (([IO.File]::ReadAllText((Join-Path $linuxTarget '.verified'))) -ceq $linuxMetadata.ArchiveSHA256) 'Linux Code verified marker mismatch.'
+    $linuxBackups = @(Get-ChildItem -LiteralPath (Split-Path $linuxTarget -Parent) -Directory -Filter '2.1.321.backup-*')
+    Assert ($linuxBackups.Count -eq 1 -and (Test-Path -LiteralPath (Join-Path $linuxBackups[0].FullName 'old.txt'))) 'Old Linux Code backup missing.'
     Assert (Test-Path -LiteralPath (Join-Path $target 'rootfs.vhdx')) 'VM not installed in fixture target.'
     foreach ($name in @('rootfs.vhdx', 'vmlinuz', 'initrd')) {
         Assert (([IO.File]::ReadAllText((Join-Path $target ('.' + $name + '.origin')))) -ceq $originRevision) 'Verified origin marker was not generated.'
@@ -109,6 +132,40 @@ Write-Host 'Synthetic installation, backup and session protection: PASS'
 & (Join-Path $scripts 'build-cowork-installer.ps1') -PatchDirectory $patch -MaxArchivePartBytes 512
 $installerDir = "$patch-Installer"
 $assembly = [Reflection.Assembly]::LoadFile((Join-Path $installerDir 'Install-Cowork-VM.exe'))
+# Exercise the real -File process boundary: direct & invocation misses PS 5.1 default binding.
+function Assert-VerifyProcess([Diagnostics.ProcessStartInfo]$Start) {
+    $Start.Arguments += ' -VerifyOnly'
+    $Start.WorkingDirectory = $testRoot
+    $Start.UseShellExecute = $false
+    $Start.CreateNoWindow = $true
+    # Let Windows PowerShell initialize its own modules instead of inheriting PowerShell 7's paths.
+    $Start.EnvironmentVariables.Remove('PSModulePath')
+    $Start.RedirectStandardOutput = $true
+    $Start.RedirectStandardError = $true
+    $child = [Diagnostics.Process]::Start($Start)
+    try {
+        $stdout = $child.StandardOutput.ReadToEndAsync()
+        $stderr = $child.StandardError.ReadToEndAsync()
+        $child.WaitForExit()
+        Assert ($child.ExitCode -eq 0) ("Child verification failed: " + $stderr.Result)
+        Assert ($stdout.Result -match 'Payload checksums verified') 'Child did not verify the fixture.'
+    } finally { $child.Dispose() }
+}
+$childScript = Join-Path $patch 'Install-Cowork-VM.ps1'
+$windowsPowerShell = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$directStart = New-Object Diagnostics.ProcessStartInfo
+$directStart.FileName = $windowsPowerShell
+$directStart.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $childScript + '"'
+Assert-VerifyProcess $directStart
+# Recreate the old published script's default binding to ensure the new EXE supports the old ZIP.
+$legacyScript = Join-Path $patch 'Legacy-Install-Cowork-VM.ps1'
+$legacyText = [IO.File]::ReadAllText($childScript).Replace('[string]$PackageDirectory', '[string]$PackageDirectory = $PSScriptRoot')
+$legacyText = $legacyText.Replace("if (-not `$PSBoundParameters.ContainsKey('PackageDirectory')) { `$PackageDirectory = `$PSScriptRoot }", '')
+[IO.File]::WriteAllText($legacyScript, $legacyText)
+$makeStart = $assembly.GetType('CoworkPatchLauncher').GetMethod('CreateInstallStartInfo', [Reflection.BindingFlags]'NonPublic, Static')
+$legacyStart = $makeStart.Invoke($null, @([string]$legacyScript))
+Assert-VerifyProcess $legacyStart
+Write-Host 'Windows PowerShell -File default and legacy ZIP launcher compatibility: PASS'
 Add-Type -AssemblyName System.Windows.Forms
 $form = [Activator]::CreateInstance($assembly.GetType('CoworkPatchLauncher'), $true)
 try { Assert ($form.Controls.Count -eq 4) 'Cowork GUI failed to initialize.' } finally { $form.Dispose() }
@@ -152,6 +209,19 @@ Write-Host 'Split archive assembly, missing-part and corruption guards: PASS'
 
 
 $compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+# Synthetic PE resources distinguish the bootstrapper from a signed desktop EXE.
+$setupFixtureSource = Join-Path $testRoot 'SetupFixture.cs'
+$setupFixture = Join-Path $testRoot 'SetupFixture.exe'
+'[assembly: System.Reflection.AssemblyTitle("Claude Setup")] class SetupFixture { static void Main() { System.Console.WriteLine("local-msix"); } }' | Set-Content -LiteralPath $setupFixtureSource -Encoding ASCII
+& $compiler /nologo /target:exe "/out:$setupFixture" $setupFixtureSource
+Assert ($LASTEXITCODE -eq 0) 'Setup fixture compilation failed.'
+& {
+    # Isolate signature mocking to these synthetic resource checks.
+    function Assert-AnthropicSignature([string]$Path) {}
+    Assert-ClaudeBootstrapper $setupFixture
+    Must-Fail { Assert-ClaudeBootstrapper $compiler } 'Expected the official Claude Setup bootstrapper'
+}
+Write-Host 'Setup bootstrapper versus desktop EXE validation: PASS'
 $desktop = Join-Path $testRoot 'DesktopFixture.exe'
 & $compiler /nologo /target:winexe /platform:x64 /reference:System.dll /reference:System.Windows.Forms.dll "/resource:$binary,ClaudeSetup" "/resource:$binary,ClaudeMsix" "/resource:$binary,ClaudeCodeBinary" "/out:$desktop" (Join-Path $root 'src\OfflineLauncher.cs')
 Assert ($LASTEXITCODE -eq 0) 'Desktop C# compilation failed.'
@@ -161,5 +231,11 @@ Assert ($process.ExitCode -eq 0) 'Desktop extract-only failed.'
 foreach ($name in @('Claude Setup.exe', 'Claude-x64.msix', 'claude.exe')) {
     Assert ((Get-FileHash -LiteralPath (Join-Path $extracted $name)).Hash -eq (Get-FileHash -LiteralPath $binary).Hash) 'Embedded Desktop resource mismatch.'
 }
+$desktopAssembly = [Reflection.Assembly]::LoadFile($desktop)
+$verifyRegistration = $desktopAssembly.GetType('OfflineLauncher').GetMethod('VerifyInstalledMsix', [Reflection.BindingFlags]'NonPublic, Static')
+Assert ($null -ne $verifyRegistration) 'Desktop post-Setup MSIX verification is missing.'
+# Fixture assembly is unversioned; a real Claude package must never silently satisfy it.
+Must-Fail { $verifyRegistration.Invoke($null, @()) } 'MSIX.*not registered'
+Write-Host 'Desktop post-Setup current-user MSIX check: PASS'
 Write-Host 'Desktop EXE compilation and extract-only round trip: PASS'
 Write-Host "All tests passed. Fixtures retained under $testRoot"
