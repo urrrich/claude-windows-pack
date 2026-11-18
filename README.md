@@ -4,18 +4,17 @@
 
 [![Windows CI](https://github.com/urrrich/claude-windows-pack/actions/workflows/ci.yml/badge.svg)](https://github.com/urrrich/claude-windows-pack/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/urrrich/claude-windows-pack)](https://github.com/urrrich/claude-windows-pack/releases/latest)
+[![LINUX DO 社区](https://img.shields.io/badge/LINUX%20DO-%E7%A4%BE%E5%8C%BA-blue?style=flat-square)](https://linux.do/)
 
 将官方 Claude Desktop 安装资源封装为单个 EXE，并提供独立 Cowork VM 安装工具。中文安装说明、完整性校验和现有 VM 备份，让下载与部署过程更清晰。
 
 > **非官方项目，与 Anthropic 无隶属关系。** 不修改官方 MSIX，不是汉化补丁，不绕过登录、订阅或其他服务限制。离线安装资源不代表 Claude 服务可以离线使用。
 
-**开发者工具推荐：** [TeamoRouter · 多模型 API](https://teamorouter.com/?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=header_api) · [下载 Teamo 客户端](https://teamorouter.com/download?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=header_app)
-
 ## 下载
 
 > **旧包已弃用：** 4.23118.1.0 误用了 Squirrel EXE 作为 Setup，请勿继续安装。新版改用官方 Setup 引导器，并加入当前用户 MSIX 注册校验。
 
-本次候选构建：**2026-11-11**，标记为 **预发布**。资源签名、哈希和隔离测试已通过，尚未完成专用测试机真实安装及 Cowork 任务验证。
+本次候选构建于 **2026-11-11** 预发布。资源签名、哈希和隔离测试已通过，实机验证进度见[完整性与验证范围](#完整性与验证范围)。
 
 | 组件 | 版本 / 大小 | 下载渠道 |
 | --- | --- | --- |
@@ -39,20 +38,7 @@ Desktop + Windows Code 单 EXE 与 Cowork 补丁分开发放。`5.1231.2.0` 当�
     -OfficialVmManifest 'C:\inputs\vm-manifest.json' -CreateInstaller
 ```
 
-下载脚本需要支持 Zstandard 解压的 Node.js。只打包 Linux `claude` 和校验元数据；VM 的七文件白名单保持独立。客户端将来更新所需 Code 版本时，仍可能需要新补丁或联网下载。候选包尚未完成专用测试机真实安装和 Cowork 任务验证。
-
-## 开发者工具推荐 · Teamo
-
-**装好客户端，也为下一步 AI 开发准备好工具。**
-
-如果你还需要接入多模型 API，或配置本地 AI 编程工具，可以了解 TeamoRouter 与 Teamo 客户端：
-
-| 你的需求 | 推荐入口 |
-| --- | --- |
-| 查看模型、接入 API，为自己的应用添加 AI 能力 | **[了解 TeamoRouter](https://teamorouter.com/?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_api)** · [API 接入文档](https://teamorouter.com/docs/api-integration?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_docs) |
-| 使用桌面界面配置本地 AI 代理、切换模型 | **[下载 Teamo 客户端 · Windows / macOS](https://teamorouter.com/download?utm_source=github&utm_medium=readme&utm_campaign=claude_windows_pack&utm_content=tools_app)** |
-
-Teamo 是独立的可选产品，其账号、API 计费和功能范围以官网为准。本项目的 Claude 安装包不依赖 Teamo；Teamo 的 API 服务不等同于 Claude Desktop / Cowork 的账号订阅或功能授权。
+下载脚本需要支持 Zstandard 解压的 Node.js。只打包 Linux `claude` 和校验元数据；VM 的七文件白名单保持独立。客户端将来更新所需 Code 版本时，仍可能需要新补丁或联网下载。
 
 ## 快速安装
 
@@ -117,9 +103,17 @@ VM 的校验清单和来源记录随网盘包提供。VM 版本为 `072b6cbfe74f
 | Desktop EXE 解包及嵌入文件哈希 | 通过 |
 | VM 官方清单、实际 ZIP 全部文件及分卷拼接哈希 | 通过 |
 | PowerShell 5.1 / PowerShell 7 自动测试 | 通过 |
-| 真实机器安装、提权、官方 Setup 兼容性、Cowork VM 启动 | **尚未验证** |
+| 专用测试机上的安装、提权、官方 Setup 兼容性 | **尚未验证** |
+| 专用测试机上的 Cowork VM 启动和任务运行 | **尚未验证** |
 
 本项目编译的包装器默认未签名，官方组件保留原始签名。哈希可检查文件完整性，不能替代对下载来源的信任判断。
+
+## 配套工具 · Teamo
+
+TeamoRouter 提供多模型 API，Teamo 客户端可用于配置本地 AI 编程工具。两者都是独立的第三方产品，可按需选用。Claude Desktop 和 Cowork 仍需满足上述登录和功能权限要求。
+
+- 多模型 API 接入与计费说明见 [TeamoRouter 官网](https://teamorouter.com/)和 [API 接入文档](https://teamorouter.com/docs/api-integration)。
+- Windows 和 macOS 版本见 [Teamo 客户端下载页](https://teamorouter.com/download)。
 
 ---
 ## 从源码构建
@@ -270,6 +264,10 @@ releases/            本地构建产物，不提交
 - 哈希证明文件未变，不证明分发者可信。应通过可信渠道取得安装器并检查包装器签名。
 - 不保证位级可复现：官方 `latest`、签名验证环境、编译器和时间戳会影响结果。复核版本来源可查 `BUILD-INFO.json`。
 - 本项目不自动发布官方二进制文件。公开源码不等于获得第三方文件、图标或商标的再分发授权。
+
+## 社区与鸣谢
+
+感谢试用本项目并提供反馈的读者。社区交流可访问 [LINUX DO](https://linux.do/)。
 
 ## 许可与第三方说明
 
