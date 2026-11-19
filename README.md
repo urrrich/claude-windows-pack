@@ -12,10 +12,6 @@
 
 ## 下载
 
-> **旧包已弃用：** 4.23118.1.0 误用了 Squirrel EXE 作为 Setup，请勿继续安装。新版改用官方 Setup 引导器，并加入当前用户 MSIX 注册校验。
-
-本次候选构建于 **2026-11-11** 预发布。资源签名、哈希和隔离测试已通过。**2026-11-17** 在 Windows 上完成一次 Cowork 文件校验任务，详情见[完整性与验证范围](#完整性与验证范围)。
-
 | 组件 | 版本 / 大小 | 下载渠道 |
 | --- | --- | --- |
 | Desktop + Windows Code | Desktop 5.1231.2.0 + Code 2.1.322 · 621.47 MiB | **[下载安装器](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe)** · [SHA-256](https://github.com/urrrich/claude-windows-pack/releases/download/v5.1231.2.0-rc.1/Claude-Desktop-5.1231.2.0.exe.sha256) |
